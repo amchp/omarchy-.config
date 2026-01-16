@@ -1,0 +1,18 @@
+2026-01-16 05:30:19 Loading main app package /usr/lib/obsidian/obsidian.asar
+2026-01-16 05:30:19 Checking for update using Github
+2026-01-16 05:30:20 Success.
+2026-01-16 05:30:20 Latest version is 1.11.4
+2026-01-16 05:30:20 Downloading update from https://github.com/obsidianmd/obsidian-releases/releases/download/v1.11.4/obsidian-1.11.4.asar.gz
+2026-01-16 05:49:09 Loading main app package /usr/lib/obsidian/obsidian.asar
+2026-01-16 05:49:09 Checking for update using Github
+2026-01-16 05:49:10 Success.
+2026-01-16 05:49:10 Latest version is 1.11.4
+2026-01-16 05:49:10 Downloading update from https://github.com/obsidianmd/obsidian-releases/releases/download/v1.11.4/obsidian-1.11.4.asar.gz
+2026-01-16 05:49:36 Verifying hash & signature. Size= 8769455
+2026-01-16 05:49:36 Saving file
+2026-01-16 05:49:36 Update complete.
+2026-01-16 05:51:13 Loading updated app package /home/automac/.config/obsidian/obsidian-1.11.4.asar
+2026-01-16 05:51:13 Checking for update using Github
+2026-01-16 05:51:13 Success.
+2026-01-16 05:51:13 Latest version is 1.11.4
+2026-01-16 05:51:13 App is up to date.

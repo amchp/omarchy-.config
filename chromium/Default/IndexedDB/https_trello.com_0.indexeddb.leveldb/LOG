@@ -1,0 +1,6 @@
+2026/01/16-00:56:22.468 447f Creating DB /home/automac/.config/chromium/Default/IndexedDB/https_trello.com_0.indexeddb.leveldb since it was missing.
+2026/01/16-00:56:22.471 447f Reusing MANIFEST /home/automac/.config/chromium/Default/IndexedDB/https_trello.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/01/16-01:06:30.242 4470 Level-0 table #5: started
+2026/01/16-01:06:30.243 4470 Level-0 table #5: 11880 bytes OK
+2026/01/16-01:06:30.244 4470 Delete type=0 #3
+2026/01/16-01:06:30.244 4470 Manual compaction at level-0 from (begin) .. (end); will stop at (end)
