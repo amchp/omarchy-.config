@@ -1,1 +1,0 @@
-/home/automac/.config/omarchy/current/theme/neovim.lua

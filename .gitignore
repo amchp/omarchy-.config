@@ -1,0 +1,23 @@
+# Browser profiles (caches, databases, personal data)
+1Password/
+chromium/
+google-chrome/
+google-chrome-beta/
+google-chrome-unstable/
+BraveSoftware/
+vivaldi/
+vivaldi-snapshot/
+microsoft-edge-dev/
+
+# Application data (not config)
+obsidian/
+Typora/
+elephant/
+nautilus/
+
+# Runtime state / binary databases
+dconf/
+ibus/
+pulse/
+hyprland-preview-share-picker/
+yay/
