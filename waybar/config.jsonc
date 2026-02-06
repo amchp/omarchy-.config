@@ -10,6 +10,7 @@
     "group/tray-expander",
     "bluetooth",
     "network",
+    "hyprland/language",
     "pulseaudio",
     "cpu",
     "battery"
@@ -106,6 +107,13 @@
     "format-no-controller": "",
     "tooltip-format": "Devices connected: {num_connections}",
     "on-click": "omarchy-launch-bluetooth"
+  },
+  "hyprland/language": {
+    "format": "{}",
+    "format-en": "EN",
+    "format-es": "ES",
+    "tooltip-format": "Keyboard: {long}",
+    "on-click": "hyprctl switchxkblayout all next"
   },
   "pulseaudio": {
     "format": "{icon}",

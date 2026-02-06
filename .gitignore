@@ -21,3 +21,9 @@ ibus/
 pulse/
 hyprland-preview-share-picker/
 yay/
+
+# Slack (app data, caches, cookies)
+Slack/
+
+# Systemd user service symlinks (machine-specific)
+systemd/

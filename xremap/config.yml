@@ -1,0 +1,24 @@
+keymap:
+  - name: macOS-style text navigation
+    remap:
+      # Word movement (Alt + Arrow -> Ctrl + Arrow)
+      M-Left: C-Left
+      M-Right: C-Right
+
+      # Line movement (Ctrl + Arrow -> Home/End)
+      C-Left: Home
+      C-Right: End
+
+      # Word selection (Shift + Alt + Arrow -> Shift + Ctrl + Arrow)
+      Shift-M-Left: Shift-C-Left
+      Shift-M-Right: Shift-C-Right
+
+      # Line selection (Shift + Ctrl + Arrow -> Shift + Home/End)
+      Shift-C-Left: Shift-Home
+      Shift-C-Right: Shift-End
+
+      # Word delete (Alt + Backspace -> Ctrl + Backspace)
+      M-BackSpace: C-BackSpace
+
+      # Line delete (Ctrl + Backspace -> select to start, then delete)
+      C-BackSpace: [Shift-Home, BackSpace]
