@@ -27,3 +27,11 @@ Slack/
 
 # Systemd user service symlinks (machine-specific)
 systemd/
+
+# Auto-generated GTK settings
+gtk-3.0/
+gtk-4.0/
+
+# App data (not config)
+Postman/
+Todoist/

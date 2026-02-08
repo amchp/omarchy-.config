@@ -17,8 +17,22 @@ keymap:
       Shift-C-Left: Shift-Home
       Shift-C-Right: Shift-End
 
+  - name: macOS-style delete (GUI apps)
+    application:
+      not: [com.mitchellh.ghostty, Alacritty, kitty, foot]
+    remap:
       # Word delete (Alt + Backspace -> Ctrl + Backspace)
       M-BackSpace: C-BackSpace
 
       # Line delete (Ctrl + Backspace -> select to start, then delete)
       C-BackSpace: [Shift-Home, BackSpace]
+
+  - name: macOS-style delete (terminals)
+    application:
+      only: [com.mitchellh.ghostty, Alacritty, kitty, foot]
+    remap:
+      # Word delete (Alt + Backspace -> Ctrl + W, which shells interpret as word-rubout)
+      M-BackSpace: C-w
+
+      # Line delete (Ctrl + Backspace -> Ctrl + U, which shells interpret as kill-to-beginning)
+      C-BackSpace: C-u
