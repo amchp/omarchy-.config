@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "Usage: worktree-new <branch> [base-ref]"
+  echo ""
+  echo "Create a git worktree and tmux session for the given branch."
+  echo "If the worktree/session already exist, just switch to it."
+  echo ""
+  echo "Arguments:"
+  echo "  branch     Branch name to create/checkout"
+  echo "  base-ref   Base ref to create branch from (default: HEAD)"
+  exit 1
+}
+
+[[ $# -lt 1 ]] && usage
+[[ "$1" == "--help" || "$1" == "-h" ]] && usage
+
+branch="$1"
+base_ref="${2:-HEAD}"
+
+# Detect repo root and name
+repo_root="$(git rev-parse --show-toplevel)"
+repo_name="$(basename "$repo_root")"
+worktrees_dir="$(dirname "$repo_root")/${repo_name}-worktrees"
+worktree_path="${worktrees_dir}/${branch}"
+
+# Sanitize session name: replace / and . with -, strip leading dots/dashes
+# (tmux treats leading - as a flag)
+session_name="${repo_name}/${branch}"
+session_name_sanitized="${session_name//\//-}"
+session_name_sanitized="${session_name_sanitized//./-}"
+session_name_sanitized="${session_name_sanitized#"${session_name_sanitized%%[!-]*}"}"
+
+switch_to_session() {
+  if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "$session_name_sanitized"
+  else
+    tmux attach-session -t "$session_name_sanitized"
+  fi
+}
+
+# If session already exists, just switch to it
+if tmux has-session -t "$session_name_sanitized" 2>/dev/null; then
+  echo "Session '$session_name_sanitized' already exists, switching..."
+  switch_to_session
+  exit 0
+fi
+
+# Create worktrees directory if needed
+mkdir -p "$worktrees_dir"
+
+# Create the worktree if it doesn't exist
+if [[ ! -d "$worktree_path" ]]; then
+  # 3-way branch check
+  if git show-ref --verify --quiet "refs/heads/${branch}"; then
+    # Branch exists locally
+    echo "Using existing local branch '${branch}'"
+    git worktree add "$worktree_path" "$branch"
+  elif git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+    # Branch exists on remote
+    echo "Tracking remote branch 'origin/${branch}'"
+    git worktree add "$worktree_path" "$branch"
+  else
+    # Branch doesn't exist — create from base-ref
+    echo "Creating new branch '${branch}' from '${base_ref}'"
+    git worktree add -b "$branch" "$worktree_path" "$base_ref"
+  fi
+else
+  echo "Worktree already exists at ${worktree_path}"
+fi
+
+# Create tmux session with 3 windows
+# Window 1: horizontal split (top/bottom)
+tmux new-session -d -s "$session_name_sanitized" -c "$worktree_path" -n "edit"
+tmux split-window -v -t "$session_name_sanitized:edit" -c "$worktree_path"
+
+# Window 2: single pane
+tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "build"
+
+# Window 3: single pane
+tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "misc"
+
+# Focus on Window 1, top pane
+tmux select-window -t "$session_name_sanitized:edit"
+tmux select-pane -t "$session_name_sanitized:edit.0"
+
+# Switch to the session
+echo "Created session '$session_name_sanitized' for worktree at ${worktree_path}"
+switch_to_session

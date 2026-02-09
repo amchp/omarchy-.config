@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "Usage: worktree-rm [branch] [--delete-branch]"
+  echo ""
+  echo "Remove a git worktree and its tmux session."
+  echo "If no branch is specified, select interactively via fzf."
+  echo ""
+  echo "Options:"
+  echo "  --delete-branch    Also delete the git branch (with safety check)"
+  exit 1
+}
+
+delete_branch=false
+branch=""
+
+# Parse arguments
+for arg in "$@"; do
+  case "$arg" in
+    --delete-branch) delete_branch=true ;;
+    --help|-h) usage ;;
+    *) [[ -z "$branch" ]] && branch="$arg" ;;
+  esac
+done
+
+# Detect repo root and name
+repo_root="$(git rev-parse --show-toplevel)"
+repo_name="$(basename "$repo_root")"
+worktrees_dir="$(dirname "$repo_root")/${repo_name}-worktrees"
+
+# If no branch specified, use fzf to pick one
+if [[ -z "$branch" ]]; then
+  if [[ ! -d "$worktrees_dir" ]] || [[ -z "$(ls -A "$worktrees_dir" 2>/dev/null)" ]]; then
+    echo "No worktrees found in ${worktrees_dir}"
+    exit 1
+  fi
+
+  branch="$(ls -1 "$worktrees_dir" | fzf --prompt="Select worktree to remove: " --height=40%)" || {
+    echo "No selection made."
+    exit 1
+  }
+fi
+
+worktree_path="${worktrees_dir}/${branch}"
+session_name="${repo_name}/${branch}"
+session_name_sanitized="${session_name//\//-}"
+session_name_sanitized="${session_name_sanitized//./-}"
+session_name_sanitized="${session_name_sanitized#"${session_name_sanitized%%[!-]*}"}"
+
+# Kill tmux session if it exists
+if tmux has-session -t "$session_name_sanitized" 2>/dev/null; then
+  echo "Killing tmux session '$session_name_sanitized'..."
+  tmux kill-session -t "$session_name_sanitized"
+fi
+
+# Remove the worktree
+if [[ -d "$worktree_path" ]]; then
+  echo "Removing worktree at ${worktree_path}..."
+  if ! git worktree remove "$worktree_path" 2>/dev/null; then
+    echo "Warning: Worktree has uncommitted changes."
+    read -rp "Force remove? [y/N] " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+      git worktree remove --force "$worktree_path"
+    else
+      echo "Worktree kept."
+      exit 1
+    fi
+  fi
+else
+  echo "Worktree path ${worktree_path} does not exist, skipping removal."
+fi
+
+# Clean up empty worktrees parent directory
+if [[ -d "$worktrees_dir" ]] && [[ -z "$(ls -A "$worktrees_dir" 2>/dev/null)" ]]; then
+  echo "Removing empty worktrees directory ${worktrees_dir}..."
+  rmdir "$worktrees_dir"
+fi
+
+# Optionally delete the branch
+if [[ "$delete_branch" == true ]]; then
+  if git show-ref --verify --quiet "refs/heads/${branch}"; then
+    echo "Deleting branch '${branch}'..."
+    if ! git branch -d "$branch" 2>/dev/null; then
+      echo "Warning: Branch '${branch}' has unmerged changes."
+      read -rp "Force delete? [y/N] " confirm
+      if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        git branch -D "$branch"
+        echo "Branch '${branch}' force deleted."
+      else
+        echo "Branch '${branch}' kept."
+      fi
+    else
+      echo "Branch '${branch}' deleted."
+    fi
+  else
+    echo "Branch '${branch}' not found locally, skipping deletion."
+  fi
+fi
+
+echo "Done."

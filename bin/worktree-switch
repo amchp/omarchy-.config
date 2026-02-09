@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Detect repo root and name
+repo_root="$(git rev-parse --show-toplevel)"
+repo_name="$(basename "$repo_root")"
+worktrees_dir="$(dirname "$repo_root")/${repo_name}-worktrees"
+
+if [[ ! -d "$worktrees_dir" ]] || [[ -z "$(ls -A "$worktrees_dir" 2>/dev/null)" ]]; then
+  echo "No worktrees found in ${worktrees_dir}"
+  echo "Create one with: worktree-new <branch>"
+  exit 1
+fi
+
+# Pick a worktree via fzf
+branch="$(ls -1 "$worktrees_dir" | fzf --prompt="Switch to worktree: " --height=40%)" || {
+  echo "No selection made."
+  exit 1
+}
+
+worktree_path="${worktrees_dir}/${branch}"
+session_name="${repo_name}/${branch}"
+session_name_sanitized="${session_name//\//-}"
+session_name_sanitized="${session_name_sanitized//./-}"
+session_name_sanitized="${session_name_sanitized#"${session_name_sanitized%%[!-]*}"}"
+
+switch_to_session() {
+  if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "$session_name_sanitized"
+  else
+    tmux attach-session -t "$session_name_sanitized"
+  fi
+}
+
+# If session exists, just switch
+if tmux has-session -t "$session_name_sanitized" 2>/dev/null; then
+  echo "Switching to session '$session_name_sanitized'..."
+  switch_to_session
+  exit 0
+fi
+
+# Session doesn't exist — create it with the standard 3-window layout
+echo "Creating session '$session_name_sanitized' for worktree at ${worktree_path}..."
+
+# Window 1: horizontal split (top/bottom)
+tmux new-session -d -s "$session_name_sanitized" -c "$worktree_path" -n "edit"
+tmux split-window -v -t "$session_name_sanitized:edit" -c "$worktree_path"
+
+# Window 2: single pane
+tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "build"
+
+# Window 3: single pane
+tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "misc"
+
+# Focus on Window 1, top pane
+tmux select-window -t "$session_name_sanitized:edit"
+tmux select-pane -t "$session_name_sanitized:edit.0"
+
+switch_to_session

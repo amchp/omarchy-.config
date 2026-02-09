@@ -29,6 +29,8 @@
 [user]
 	name = Alejandro Mc Ewen
 	email = mcewenalejandro@gmail.com
+[includeIf "gitdir:~/Documents/Work/"]
+	path = ~/.config/git/config-work
 [credential "https://github.com"]
 	helper = 
 	helper = !/usr/bin/gh auth git-credential
