@@ -19,30 +19,33 @@ usage() {
 branch="$1"
 base_ref="${2:-HEAD}"
 
-# Detect repo root and name
-repo_root="$(git rev-parse --show-toplevel)"
+# Get main repo root (works from main repo or any worktree)
+repo_root="$(git worktree list --porcelain | head -1)"
+repo_root="${repo_root#worktree }"
 repo_name="$(basename "$repo_root")"
 worktrees_dir="$(dirname "$repo_root")/${repo_name}-worktrees"
+
+# Preserve branch hierarchy in directory structure
 worktree_path="${worktrees_dir}/${branch}"
 
-# Sanitize session name: replace / and . with -, strip leading dots/dashes
-# (tmux treats leading - as a flag)
+# Session name: replace / with __ to avoid tmux confusion, also replace . and :
 session_name="${repo_name}/${branch}"
-session_name_sanitized="${session_name//\//-}"
-session_name_sanitized="${session_name_sanitized//./-}"
-session_name_sanitized="${session_name_sanitized#"${session_name_sanitized%%[!-]*}"}"
+session_name="${session_name//\//__}"
+session_name="${session_name//./-}"
+session_name="${session_name//:/}"
+session_name="${session_name#"${session_name%%[!-]*}"}"
 
 switch_to_session() {
   if [[ -n "${TMUX:-}" ]]; then
-    tmux switch-client -t "$session_name_sanitized"
+    tmux switch-client -t "=$session_name"
   else
-    tmux attach-session -t "$session_name_sanitized"
+    tmux attach-session -t "=$session_name"
   fi
 }
 
 # If session already exists, just switch to it
-if tmux has-session -t "$session_name_sanitized" 2>/dev/null; then
-  echo "Session '$session_name_sanitized' already exists, switching..."
+if tmux has-session -t "=$session_name" 2>/dev/null; then
+  echo "Session '$session_name' already exists, switching..."
   switch_to_session
   exit 0
 fi
@@ -70,21 +73,48 @@ else
   echo "Worktree already exists at ${worktree_path}"
 fi
 
+# Symlink files/directories from main repo if .worktree-symlinks exists
+symlinks_config="${repo_root}/.worktree-symlinks"
+if [[ -f "$symlinks_config" ]]; then
+  echo "Setting up symlinks from .worktree-symlinks..."
+  while IFS= read -r link_path || [[ -n "$link_path" ]]; do
+    # Skip empty lines and comments
+    [[ -z "$link_path" || "$link_path" =~ ^[[:space:]]*# ]] && continue
+
+    source_path="${repo_root}/${link_path}"
+    target_path="${worktree_path}/${link_path}"
+
+    if [[ -e "$source_path" ]]; then
+      if [[ -e "$target_path" || -L "$target_path" ]]; then
+        echo "  Skipping ${link_path} (already exists)"
+      else
+        # Create parent directory if needed
+        target_dir="$(dirname "$target_path")"
+        mkdir -p "$target_dir"
+        ln -s "$source_path" "$target_path"
+        echo "  Symlinked ${link_path}"
+      fi
+    else
+      echo "  Warning: ${link_path} not found in main repo, skipping"
+    fi
+  done < "$symlinks_config"
+fi
+
 # Create tmux session with 3 windows
-# Window 1: horizontal split (top/bottom)
-tmux new-session -d -s "$session_name_sanitized" -c "$worktree_path" -n "edit"
-tmux split-window -v -t "$session_name_sanitized:edit" -c "$worktree_path"
+# Window 1: vertical split (left/right panes)
+tmux new-session -d -s "$session_name" -c "$worktree_path" -n "edit"
+tmux split-window -h -t "=$session_name:edit" -c "$worktree_path"
 
 # Window 2: single pane
-tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "build"
+tmux new-window -t "=$session_name" -c "$worktree_path" -n "build"
 
 # Window 3: single pane
-tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "misc"
+tmux new-window -t "=$session_name" -c "$worktree_path" -n "misc"
 
-# Focus on Window 1, top pane
-tmux select-window -t "$session_name_sanitized:edit"
-tmux select-pane -t "$session_name_sanitized:edit.0"
+# Focus on Window 1, left pane
+tmux select-window -t "=$session_name:edit"
+tmux select-pane -t "=$session_name:edit.0"
 
 # Switch to the session
-echo "Created session '$session_name_sanitized' for worktree at ${worktree_path}"
+echo "Created session '$session_name' for worktree at ${worktree_path}"
 switch_to_session

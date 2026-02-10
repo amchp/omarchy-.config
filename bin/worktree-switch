@@ -1,59 +1,79 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Detect repo root and name
-repo_root="$(git rev-parse --show-toplevel)"
+# Get main repo root (works from main repo or any worktree)
+repo_root="$(git worktree list --porcelain | head -1)"
+repo_root="${repo_root#worktree }"
 repo_name="$(basename "$repo_root")"
 worktrees_dir="$(dirname "$repo_root")/${repo_name}-worktrees"
 
-if [[ ! -d "$worktrees_dir" ]] || [[ -z "$(ls -A "$worktrees_dir" 2>/dev/null)" ]]; then
+# List worktree branches under worktrees_dir using git's own metadata
+list_worktree_branches() {
+  git worktree list --porcelain | awk -v dir="$worktrees_dir" '
+    /^worktree / { wt = substr($0, 10) }
+    /^branch /   {
+      if (index(wt, dir"/") == 1) {
+        b = substr($0, 8)
+        sub(/^refs\/heads\//, "", b)
+        print b
+      }
+    }
+  '
+}
+
+branches="$(list_worktree_branches)"
+if [[ -z "$branches" ]]; then
   echo "No worktrees found in ${worktrees_dir}"
   echo "Create one with: worktree-new <branch>"
   exit 1
 fi
 
 # Pick a worktree via fzf
-branch="$(ls -1 "$worktrees_dir" | fzf --prompt="Switch to worktree: " --height=40%)" || {
+branch="$(echo "$branches" | fzf --prompt="Switch to worktree: " --height=40%)" || {
   echo "No selection made."
   exit 1
 }
 
+# Preserve branch hierarchy in directory structure
 worktree_path="${worktrees_dir}/${branch}"
+
+# Session name: replace / with __ to avoid tmux confusion, also replace . and :
 session_name="${repo_name}/${branch}"
-session_name_sanitized="${session_name//\//-}"
-session_name_sanitized="${session_name_sanitized//./-}"
-session_name_sanitized="${session_name_sanitized#"${session_name_sanitized%%[!-]*}"}"
+session_name="${session_name//\//__}"
+session_name="${session_name//./-}"
+session_name="${session_name//:/}"
+session_name="${session_name#"${session_name%%[!-]*}"}"
 
 switch_to_session() {
   if [[ -n "${TMUX:-}" ]]; then
-    tmux switch-client -t "$session_name_sanitized"
+    tmux switch-client -t "=$session_name"
   else
-    tmux attach-session -t "$session_name_sanitized"
+    tmux attach-session -t "=$session_name"
   fi
 }
 
 # If session exists, just switch
-if tmux has-session -t "$session_name_sanitized" 2>/dev/null; then
-  echo "Switching to session '$session_name_sanitized'..."
+if tmux has-session -t "=$session_name" 2>/dev/null; then
+  echo "Switching to session '$session_name'..."
   switch_to_session
   exit 0
 fi
 
 # Session doesn't exist — create it with the standard 3-window layout
-echo "Creating session '$session_name_sanitized' for worktree at ${worktree_path}..."
+echo "Creating session '$session_name' for worktree at ${worktree_path}..."
 
-# Window 1: horizontal split (top/bottom)
-tmux new-session -d -s "$session_name_sanitized" -c "$worktree_path" -n "edit"
-tmux split-window -v -t "$session_name_sanitized:edit" -c "$worktree_path"
+# Window 1: vertical split (left/right panes)
+tmux new-session -d -s "$session_name" -c "$worktree_path" -n "edit"
+tmux split-window -h -t "=$session_name:edit" -c "$worktree_path"
 
 # Window 2: single pane
-tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "build"
+tmux new-window -t "=$session_name" -c "$worktree_path" -n "build"
 
 # Window 3: single pane
-tmux new-window -t "$session_name_sanitized" -c "$worktree_path" -n "misc"
+tmux new-window -t "=$session_name" -c "$worktree_path" -n "misc"
 
-# Focus on Window 1, top pane
-tmux select-window -t "$session_name_sanitized:edit"
-tmux select-pane -t "$session_name_sanitized:edit.0"
+# Focus on Window 1, left pane
+tmux select-window -t "=$session_name:edit"
+tmux select-pane -t "=$session_name:edit.0"
 
 switch_to_session

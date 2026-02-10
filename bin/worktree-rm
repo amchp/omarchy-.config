@@ -24,34 +24,54 @@ for arg in "$@"; do
   esac
 done
 
-# Detect repo root and name
-repo_root="$(git rev-parse --show-toplevel)"
+# Get main repo root (works from main repo or any worktree)
+repo_root="$(git worktree list --porcelain | head -1)"
+repo_root="${repo_root#worktree }"
 repo_name="$(basename "$repo_root")"
 worktrees_dir="$(dirname "$repo_root")/${repo_name}-worktrees"
 
+# List worktree branches under worktrees_dir using git's own metadata
+list_worktree_branches() {
+  git worktree list --porcelain | awk -v dir="$worktrees_dir" '
+    /^worktree / { wt = substr($0, 10) }
+    /^branch /   {
+      if (index(wt, dir"/") == 1) {
+        b = substr($0, 8)
+        sub(/^refs\/heads\//, "", b)
+        print b
+      }
+    }
+  '
+}
+
 # If no branch specified, use fzf to pick one
 if [[ -z "$branch" ]]; then
-  if [[ ! -d "$worktrees_dir" ]] || [[ -z "$(ls -A "$worktrees_dir" 2>/dev/null)" ]]; then
+  branches="$(list_worktree_branches)"
+  if [[ -z "$branches" ]]; then
     echo "No worktrees found in ${worktrees_dir}"
     exit 1
   fi
 
-  branch="$(ls -1 "$worktrees_dir" | fzf --prompt="Select worktree to remove: " --height=40%)" || {
+  branch="$(echo "$branches" | fzf --prompt="Select worktree to remove: " --height=40%)" || {
     echo "No selection made."
     exit 1
   }
 fi
 
+# Preserve branch hierarchy in directory structure
 worktree_path="${worktrees_dir}/${branch}"
+
+# Session name: replace / with __ to avoid tmux confusion, also replace . and :
 session_name="${repo_name}/${branch}"
-session_name_sanitized="${session_name//\//-}"
-session_name_sanitized="${session_name_sanitized//./-}"
-session_name_sanitized="${session_name_sanitized#"${session_name_sanitized%%[!-]*}"}"
+session_name="${session_name//\//__}"
+session_name="${session_name//./-}"
+session_name="${session_name//:/}"
+session_name="${session_name#"${session_name%%[!-]*}"}"
 
 # Kill tmux session if it exists
-if tmux has-session -t "$session_name_sanitized" 2>/dev/null; then
-  echo "Killing tmux session '$session_name_sanitized'..."
-  tmux kill-session -t "$session_name_sanitized"
+if tmux has-session -t "=$session_name" 2>/dev/null; then
+  echo "Killing tmux session '$session_name'..."
+  tmux kill-session -t "=$session_name"
 fi
 
 # Remove the worktree
